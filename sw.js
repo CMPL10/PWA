@@ -22,7 +22,7 @@ self.addEventListener("fetch", fetchEvent => {
     )
   })
  */
-  const version = 3;
+  /* const version = 3;
   let staticName = `staticCache-${version}`;
   let dynamicName = `dynamicCache`;
   let imageName = `imageCache-${version}`;
@@ -33,11 +33,9 @@ self.addEventListener("fetch", fetchEvent => {
   };
   const assets = [
     "/index.html",
-    "/css",
-    "/img",
-    "/js",
-    "form.html",
-    "manifest.json"
+    "/form.html",
+    "/manifest.json",
+    "/app.js"
   
   ]
   let imageAssets = ['/img/1011-800x600.jpg', '/img/distracted-boyfriend.jpg'];
@@ -197,4 +195,85 @@ self.addEventListener("fetch", fetchEvent => {
         callback();
       }
     };
+  };
+ */
+  const version = 3;
+  let staticName = `staticCache-${version}`;
+  let dynamicName = `dynamicCache`;
+  let imageName = `imageCache-${version}`;
+  let options = {
+    ignoreSearch: false,
+    ignoreMethod: false,
+    ignoreVary: false,
+  };
+  const assets = [
+    "/index.html",
+    "/form.html",
+    "/manifest.json",
+    "/app.js"
+  ];
+  
+  let DB = null;
+  
+  self.addEventListener('install', (ev) => {
+    console.log(`Version ${version} installed`);
+    ev.waitUntil(
+      caches
+        .open(staticName)
+        .then((cache) => {
+          return cache.addAll(assets);
+        })
+        .then(() => {
+          caches.open(imageName).then((cache) => {
+            // Remove imageAssets as requested
+          });
+        })
+    );
+  });
+  
+  self.addEventListener('activate', (ev) => {
+    console.log('activated');
+    ev.waitUntil(
+      caches.keys().then((keys) => {
+        return Promise.all(
+          keys
+            .filter((key) => {
+              if (key != staticName && key != imageName) {
+                return true;
+              }
+            })
+            .map((key) => caches.delete(key))
+        ).then(() => {
+          openDB();
+        });
+      })
+    );
+  });
+  
+  self.addEventListener('fetch', (ev) => {
+    ev.respondWith(
+      caches.match(ev.request, options).then((cacheResponse) => {
+        return (
+          cacheResponse ||
+          fetch(ev.request).then((fetchResponse) => {
+            return handleFetchResponse(fetchResponse, ev.request);
+          })
+        );
+      })
+    );
+  });
+  
+  const handleFetchResponse = (fetchResponse, request) => {
+    let type = fetchResponse.headers.get('content-type');
+    if (type && type.match(/^image\//i)) {
+      return caches.open(imageName).then((cache) => {
+        cache.put(request, fetchResponse.clone());
+        return fetchResponse;
+      });
+    } else {
+      return caches.open(dynamicName).then((cache) => {
+        cache.put(request, fetchResponse.clone());
+        return fetchResponse;
+      });
+    }
   };
